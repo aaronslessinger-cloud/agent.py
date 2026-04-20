@@ -82,20 +82,52 @@ def send_email_alert(listing):
 def main():
     listings = get_listings()
     print(f"Found {len(listings)} total vehicles. Evaluating against criteria...")
-    
-    match_count = 0
-    for car in listings:
-        if evaluate_listing(car):
-            print(f"Perfect Match found! VIN: {car['vin']}")
-            send_email_alert(car)
-            match_count += 1
-            
-    if match_count == 0:
-        print("No cars matched your strict Ultra Luxury / Black Interior criteria today.")
+import os
+import re
+import smtplib
+from email.mime.text import MIMEText
+from apify_client import ApifyClient
 
-if __name__ == "__main__":
-    main()
-            "url": item.get("list_url", "") or item.get("url", "")
+# Secure variables
+APP_PASSWORD = os.environ.get("EMAIL_APP_PASSWORD")
+SENDER_EMAIL = "aaronslessingeragent@gmail.com"
+TARGET_EMAIL = os.environ.get("TARGET_EMAIL")
+APIFY_TOKEN = os.environ.get("APIFY_API_TOKEN")
+
+def clean_number(value, default=999999):
+    # Strips out $, commas, and text so the agent can do math with the price
+    try:
+        clean_str = re.sub(r'[^\d]', '', str(value))
+        return int(clean_str) if clean_str else default
+    except:
+        return default
+
+def get_listings():
+    print("Waking up Apify to scrape live Cars.com listings...")
+    client = ApifyClient(APIFY_TOKEN)
+    
+    search_url = "https://www.cars.com/shopping/results/?makes[]=lexus&models[]=lexus-es_350&maximum_distance=all&zip=98607&year_min=2023&list_price_max=52000"
+    
+    run_input = {
+        "startUrls": [{"url": search_url}]
+    }
+    
+    print("Scraping in progress. This may take a minute or two...")
+    # Swapped to a Pay-Per-Result Actor to avoid monthly rental fees
+    run = client.actor("nexgendata/cars-com-scraper").call(run_input=run_input)
+    
+    listings = []
+    print("Scrape complete. Formatting data...")
+    
+    for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+        # Using multiple fallback keys (.get) since different scrapers label data differently
+        listings.append({
+            "vin": item.get("vin") or item.get("VIN") or item.get("vehicleIdentificationNumber") or "Unknown",
+            "year": clean_number(item.get("year") or item.get("Year"), 0),
+            "trim": str(item.get("trim") or item.get("title") or ""),
+            "interior": str(item.get("interior_color") or item.get("interiorColor") or item.get("interior") or ""),
+            "price": clean_number(item.get("price") or item.get("Price"), 999999),
+            "url": item.get("url") or item.get("list_url") or ""
         })
     
     return listings
@@ -133,7 +165,7 @@ def send_email_alert(listing):
 
 def main():
     listings = get_listings()
-    print(f"Found {len(listings)} total vehicles matching base criteria. Evaluating...")
+    print(f"Found {len(listings)} total vehicles. Evaluating against criteria...")
     
     match_count = 0
     for car in listings:
