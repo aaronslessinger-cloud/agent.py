@@ -1,6 +1,6 @@
 import os
 import smtplib
-import requests
+import cloudscraper
 from bs4 import BeautifulSoup
 from email.mime.text import MIMEText
 
@@ -10,22 +10,22 @@ SENDER_EMAIL = "aaronslessingeragent@gmail.com"
 TARGET_EMAIL = os.environ.get("TARGET_EMAIL")
 
 def get_listings():
-    print("Going direct to the source. Fetching live Cars.com inventory...")
+    print("Equipping anti-bot stealth. Fetching live Cars.com inventory...")
     
-    # The Magic URL: We let Cars.com do the heavy filtering by passing our exact parameters
-    # Includes: Nationwide (all distance), Lexus, ES 350, Ultra Luxury, Black Interior, 2023+, Max $52k
+    # The Magic URL: Pre-filtered for 2023+ Lexus ES 350 Ultra Luxury, Black Interior, Max $52k
     url = "https://www.cars.com/shopping/results/?interior_colors[]=black&list_price_max=52000&makes[]=lexus&maximum_distance=all&models[]=lexus-es_350&trims[]=lexus-es_350-ultra_luxury&year_min=2023&zip=98607"
     
-    # We use a standard browser header so Cars.com doesn't immediately block us as a bot
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5",
-    }
+    # Cloudscraper mimics a real Chrome browser on a Windows desktop to bypass security
+    scraper = cloudscraper.create_scraper(browser={
+        'browser': 'chrome',
+        'platform': 'windows',
+        'desktop': True
+    })
     
     listings = []
     try:
-        response = requests.get(url, headers=headers, timeout=15)
+        # Increased timeout to 30 seconds to allow the invisible security handshake
+        response = scraper.get(url, timeout=30)
         if response.status_code != 200:
             print(f"Error: Cars.com returned status code {response.status_code}")
             return listings
@@ -37,7 +37,6 @@ def get_listings():
         print(f"Scraped {len(vehicle_cards)} raw listings from the live page.")
         
         for card in vehicle_cards:
-            # Extract the link
             link_tag = card.find('a', class_='vehicle-card-link')
             url_suffix = link_tag['href'] if link_tag else None
             if not url_suffix:
@@ -45,11 +44,9 @@ def get_listings():
                 
             full_url = f"https://www.cars.com{url_suffix}"
             
-            # Extract the title (Year Make Model Trim)
             title_tag = card.find('h2', class_='title')
             title = title_tag.text.strip() if title_tag else "Lexus ES 350"
             
-            # Extract the price
             price_tag = card.find('span', class_='primary-price')
             price = price_tag.text.strip() if price_tag else "Price not listed"
             
@@ -64,7 +61,6 @@ def get_listings():
     return listings
 
 def send_email_alert(listings):
-    # Bundle all matches into one clean email
     email_body = f"Your agent found {len(listings)} LIVE matching Lexus ES350s!\n\n"
     
     for car in listings:
