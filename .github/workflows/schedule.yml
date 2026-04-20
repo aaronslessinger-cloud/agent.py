@@ -2,9 +2,8 @@ name: Daily Lexus Agent Run
 
 on:
   schedule:
-    # Runs at 08:00 UTC every day
     - cron: '0 8 * * *'
-  workflow_dispatch: # Allows you to click a button to run it manually
+  workflow_dispatch:
 
 jobs:
   run-agent:
@@ -18,9 +17,12 @@ jobs:
         with:
           python-version: '3.10'
 
+      - name: Install Dependencies
+        run: pip install apify-client
+
       - name: Run Agent
         env:
           EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
           TARGET_EMAIL: ${{ secrets.TARGET_EMAIL }}
+          APIFY_API_TOKEN: ${{ secrets.APIFY_API_TOKEN }}
         run: python agent.py
-        
