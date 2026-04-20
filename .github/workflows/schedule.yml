@@ -18,10 +18,11 @@ jobs:
           python-version: '3.10'
 
       - name: Install Dependencies
-        run: pip install duckduckgo-search
+        run: pip install requests beautifulsoup4
 
       - name: Run Agent
         env:
           EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
           TARGET_EMAIL: ${{ secrets.TARGET_EMAIL }}
         run: python agent.py
+        
